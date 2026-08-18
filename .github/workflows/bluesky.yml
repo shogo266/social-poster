@@ -1,0 +1,42 @@
+name: Bluesky auto post
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bluesky-poster
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Post to Bluesky
+        run: python bluesky_bot.py
+        env:
+          BLUESKY_HANDLE:       ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+
+      - name: Commit queue pointer
+        run: |
+          if [[ -n "$(git status --porcelain queue.json)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add queue.json
+            git commit -m "advance queue pointer"
+            git push
+          fi
